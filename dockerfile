@@ -5,7 +5,7 @@ COPY "DemoRDS/DemoRDS.csproj" "DemoRDS/DemoRDS.csproj"
 
 RUN dotnet restore "DemoRDS/DemoRDS.csproj"
 
-COPY . .
+COPY DemoRDS DemoRDS/
 
 RUN dotnet publish "DemoRDS/DemoRDS.csproj" -o /published-app -c Release --no-restore
 
