@@ -140,5 +140,5 @@ jobs:
           aws ecs update-service
           --cluster $ECS_CLUSTER_NAME
           --service $ECS_SERVICE_NAME
-          --family $TASK_DEF_FAMILY
+          --task-definition $TASK_DEF_FAMILY
           --desired-count 1
