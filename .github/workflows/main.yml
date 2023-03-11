@@ -1,0 +1,127 @@
+name: demo_rds main workflow
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  release:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 7.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --no-restore
+
+  build-and-push-image:
+    if: github.event_name != 'pull_request'
+    needs: build-and-test
+
+    runs-on: ubuntu-22.04
+
+    outputs:
+      tag: ${{ fromJson(steps.meta.outputs.json).tags[0] }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_ROLE_FOR_GITHUB }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ vars.IMAGE_REPO }}
+        with:
+          images: ${{ format('{0}/{1}', env.REGISTRY, env.REPOSITORY) }}
+          tags: |
+            type=semver,pattern=v{{version}}
+            type=sha
+
+      - name: Build and push image
+        uses: docker/build-push-action@v4
+        with:
+          tags: ${{ steps.meta.outputs.tags }}
+          push: true
+
+  deploy:
+    runs-on: ubuntu-22.04
+
+    needs: build-and-push-image
+    environment: ${{ github.event_name == 'release' && 'prod' || 'dev' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_ROLE_FOR_GITHUB }}
+
+      - name: Render task definition
+        id: render-task
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: .aws/task-definition.json
+          container-name: demo-rds
+          image: ${{ needs.build-and-push-image.outputs.tag }}
+          environment-variables: |
+            Foo=${{ secrets.FOO }}
+            Bar=${{ secrets.BAR }}
+
+      - name: Register task definition
+        env:
+          TASK_DEF_FAMILY: ${{ vars.TASK_DEF_FAMILY }}
+          TASK_EXEC_ROLE: ${{ vars.TASK_EXEC_ROLE }}
+          TASK_DEF_PATH: ${{ steps.render-task.outputs.task-definition }}
+        run: >-
+          aws ecs register-task-definition
+          --family $TASK_DEF_FAMILY
+          --execution-role-arn $TASK_EXEC_ROLE
+          --cli-input-json file://$TASK_DEF_PATH
+
+      - name: Update service
+        env:
+          ECS_CLUSTER_NAME: ${{ vars.ECS_CLUSTER_NAME }}
+          ECS_SERVICE_NAME: ${{ vars.ECS_SERVICE_NAME }}
+          TASK_DEF_FAMILY: ${{ vars.TASK_DEF_FAMILY }}
+        run: >-
+          aws ecs update-service
+          --cluster $ECS_CLUSTER_NAME
+          --service $ECS_SERVICE_NAME
+          --family $TASK_DEF_FAMILY
+          --desired-count 1
