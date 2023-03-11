@@ -96,7 +96,10 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: build-data
-      
+
+      - name: Display structure of downloaded files
+        run: ls -R
+
       - name: Set tag env var
         run: echo "IMAGE_TAG=$(cat tag.txt)" >> $GITHUB_ENV
 
