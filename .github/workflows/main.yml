@@ -41,10 +41,6 @@ jobs:
 
     runs-on: ubuntu-22.04
 
-    outputs:
-      tag: sha-d1b8bdd
-      tags: ${{ toJson(fromJson(steps.meta.outputs.json).tags) }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -77,8 +73,17 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           push: true
       
-      - name: Print tag
-        run: echo ${{ fromJson(steps.meta.outputs.json).tags[0] }}
+      - name: Prepare artifact
+        run: |
+          mkdir artifact
+          echo ${{ fromJson(steps.meta.outputs.json).tags[0] }} >> tag.txt
+          cp .aws/task-definition.json artifact/task-definition.json
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-data
+          path: artifact/
 
   deploy:
     runs-on: ubuntu-22.04
@@ -87,8 +92,13 @@ jobs:
     environment: ${{ github.event_name == 'release' && 'prod' || 'dev' }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: build-data
+      
+      - name: Set tag env var
+        run: echo "IMAGE_TAG=$(cat tag.txt)" >> $GITHUB_ENV
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -96,19 +106,13 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ vars.AWS_ROLE_FOR_GITHUB }}
 
-      - name: Show tag
-        run: echo ${{ needs.build-and-push-image.outputs.tag }}
-
-      - name: Show tags
-        run: echo ${{ needs.build-and-push-image.outputs.tags }}
-
       - name: Render task definition
         id: render-task
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: .aws/task-definition.json
+          task-definition: task-definition.json
           container-name: demo-rds
-          image: ${{ fromJson(needs.build-and-push-image.outputs.tags)[0] }}
+          image: ${{ env.IMAGE_TAG }}
           environment-variables: |
             Foo=${{ secrets.FOO }}
             Bar=${{ secrets.BAR }}
