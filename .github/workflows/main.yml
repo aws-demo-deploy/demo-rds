@@ -76,12 +76,8 @@ jobs:
       - name: Prepare artifact
         run: |
           mkdir artifact
-          echo ${{ fromJson(steps.meta.outputs.json).tags[0] }}
-          echo ${{ fromJson(steps.meta.outputs.json).tags[0] }} >> tag.txt
+          echo ${{ fromJson(steps.meta.outputs.json).tags[0] }} >> artifact/tag.txt
           cp .aws/task-definition.json artifact/task-definition.json
-      
-      - name: List dir
-        run: ls -l
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
