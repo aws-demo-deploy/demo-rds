@@ -119,6 +119,7 @@ jobs:
           environment-variables: |
             Foo=${{ secrets.FOO }}
             Bar=${{ secrets.BAR }}
+            Version=${{ github.event.release.tag_name || github.sha }}
 
       - name: Register task definition
         env:
