@@ -43,6 +43,7 @@ jobs:
 
     outputs:
       tag: ${{ fromJson(steps.meta.outputs.json).tags[0] }}
+      tags: ${{ toJson(fromJson(steps.meta.outputs.json).tags) }}
 
     steps:
       - name: Checkout
@@ -92,13 +93,19 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ vars.AWS_ROLE_FOR_GITHUB }}
 
+      - name: Show tag
+        run: echo ${{ needs.build-and-push-image.outputs.tag }}
+
+      - name: Show tags
+        run: echo ${{ needs.build-and-push-image.outputs.tags }}
+
       - name: Render task definition
         id: render-task
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: .aws/task-definition.json
           container-name: demo-rds
-          image: ${{ needs.build-and-push-image.outputs.tag }}
+          image: ${{ fromJson(needs.build-and-push-image.outputs.tags)[0] }}
           environment-variables: |
             Foo=${{ secrets.FOO }}
             Bar=${{ secrets.BAR }}
