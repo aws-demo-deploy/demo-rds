@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Print Ref
-        run: echo ${{ github.workflow }}-${{ github.event_name }}
+        run: echo ${{ github.workflow }}-${{ github.event_name }}1
 
       - name: Checkout
         uses: actions/checkout@v3
