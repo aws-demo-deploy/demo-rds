@@ -76,6 +76,12 @@ jobs:
         with:
           tags: ${{ steps.meta.outputs.tags }}
           push: true
+      
+      - name: Print tag
+        run: echo ${{ fromJson(steps.meta.outputs.json).tags[0] }}
+
+      - name: Print tags
+        run: echo ${{ toJson(fromJson(steps.meta.outputs.json).tags) }}
 
   deploy:
     runs-on: ubuntu-22.04
