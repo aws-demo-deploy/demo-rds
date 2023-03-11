@@ -76,6 +76,7 @@ jobs:
       - name: Prepare artifact
         run: |
           mkdir artifact
+          echo ${{ fromJson(steps.meta.outputs.json).tags[0] }}
           echo ${{ fromJson(steps.meta.outputs.json).tags[0] }} >> tag.txt
           cp .aws/task-definition.json artifact/task-definition.json
 
