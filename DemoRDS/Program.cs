@@ -16,10 +16,10 @@ try
     var builder = WebApplication.CreateBuilder(args);
 
     builder.Host.UseSerilog((ctx, svc, cfg) => cfg
+        .WriteTo.Console()
         .ReadFrom.Configuration(ctx.Configuration)
         .ReadFrom.Services(svc)
         .Enrich.FromLogContext()
-        .WriteTo.Console()
     );
 
     var connectionString = builder.Configuration.GetConnectionString("postgres");

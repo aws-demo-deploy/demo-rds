@@ -21,9 +21,6 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Print Ref
-        run: echo ${{ github.workflow }}-${{ github.event_name }}1
-
       - name: Checkout
         uses: actions/checkout@v3
 
@@ -123,6 +120,7 @@ jobs:
           container-name: demo-rds
           image: ${{ env.IMAGE_TAG }}
           environment-variables: |
+            Serilog__LogGroup=demo-rds-backend/${{ github.event_name == 'release' && 'prod' || 'dev' }}
             Foo=${{ secrets.FOO }}
             Bar=${{ secrets.BAR }}
             Version=${{ github.event.release.tag_name || github.sha }}
@@ -130,11 +128,13 @@ jobs:
       - name: Register task definition
         env:
           TASK_DEF_FAMILY: ${{ vars.TASK_DEF_FAMILY }}
+          TASK_ROLE: ${{ vars.TASK_ROLE }}
           TASK_EXEC_ROLE: ${{ vars.TASK_EXEC_ROLE }}
           TASK_DEF_PATH: ${{ steps.render-task.outputs.task-definition }}
         run: >-
           aws ecs register-task-definition
           --family $TASK_DEF_FAMILY
+          --task-role-arn $TASK_ROLE
           --execution-role-arn $TASK_EXEC_ROLE
           --cli-input-json file://$TASK_DEF_PATH
 
